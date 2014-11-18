@@ -729,6 +729,37 @@ To see how the `docker:latest` image was built:
     750d58736b4b6cc0f9a9abe8f258cef269e3e9dceced1146503522be9f985ada   6 weeks ago         /bin/sh -c #(nop) MAINTAINER Tianon Gravi <admwiggin@gmail.com> - mkimage-debootstrap.sh -t jessie.tar.xz jessie http://http.debian.net/debian             0 B
     511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158   9 months ago                                                                                                                                                                   0 B
 
+## hosts
+
+For more information about managing Docker hosts, see "Managing Docker hosts".
+
+### active
+
+### create
+
+### inspect
+
+### ip
+
+### kill
+
+### ls
+
+### restart
+
+### rm
+
+### ssh
+
+### start
+
+### stop
+
+### upgrade
+
+### url
+
+
 ## images
 
     Usage: docker images [OPTIONS] [NAME]
