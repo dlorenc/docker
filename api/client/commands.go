@@ -30,6 +30,7 @@ import (
 	"github.com/docker/docker/graph"
 	"github.com/docker/docker/hosts"
 	"github.com/docker/docker/hosts/drivers"
+	_ "github.com/docker/docker/hosts/drivers/digitalocean"
 	_ "github.com/docker/docker/hosts/drivers/none"
 	_ "github.com/docker/docker/hosts/drivers/virtualbox"
 	"github.com/docker/docker/nat"
