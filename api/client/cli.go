@@ -1,18 +1,16 @@
 package client
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"reflect"
 	"strings"
 	"text/template"
-	"time"
 
+	"github.com/docker/docker/hosts"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/pkg/term"
 	"github.com/docker/docker/registry"
@@ -20,15 +18,11 @@ import (
 )
 
 type DockerCli struct {
-	proto      string
-	addr       string
 	configFile *registry.ConfigFile
 	in         io.ReadCloser
 	out        io.Writer
 	err        io.Writer
 	key        libtrust.PrivateKey
-	tlsConfig  *tls.Config
-	scheme     string
 	// inFd holds file descriptor of the client's STDIN, if it's a valid file
 	inFd uintptr
 	// outFd holds file descriptor of the client's STDOUT, if it's a valid file
@@ -37,6 +31,7 @@ type DockerCli struct {
 	isTerminalIn bool
 	// isTerminalOut describes if client's STDOUT is a TTY
 	isTerminalOut bool
+	host          *hosts.Host
 	transport     *http.Transport
 }
 
@@ -104,18 +99,13 @@ func (cli *DockerCli) LoadConfigFile() (err error) {
 	return err
 }
 
-func NewDockerCli(in io.ReadCloser, out, err io.Writer, key libtrust.PrivateKey, proto, addr string, tlsConfig *tls.Config) *DockerCli {
+func NewDockerCli(in io.ReadCloser, out, err io.Writer, key libtrust.PrivateKey, host *hosts.Host) *DockerCli {
 	var (
 		inFd          uintptr
 		outFd         uintptr
 		isTerminalIn  = false
 		isTerminalOut = false
-		scheme        = "http"
 	)
-
-	if tlsConfig != nil {
-		scheme = "https"
-	}
 
 	if in != nil {
 		if file, ok := in.(*os.File); ok {
@@ -135,26 +125,7 @@ func NewDockerCli(in io.ReadCloser, out, err io.Writer, key libtrust.PrivateKey,
 		err = out
 	}
 
-	// The transport is created here for reuse during the client session
-	tr := &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
-	// Why 32? See issue 8035
-	timeout := 32 * time.Second
-	if proto == "unix" {
-		// no need in compressing for local communications
-		tr.DisableCompression = true
-		tr.Dial = func(_, _ string) (net.Conn, error) {
-			return net.DialTimeout(proto, addr, timeout)
-		}
-	} else {
-		tr.Dial = (&net.Dialer{Timeout: timeout}).Dial
-	}
-
 	return &DockerCli{
-		proto:         proto,
-		addr:          addr,
 		in:            in,
 		out:           out,
 		err:           err,
@@ -163,8 +134,6 @@ func NewDockerCli(in io.ReadCloser, out, err io.Writer, key libtrust.PrivateKey,
 		outFd:         outFd,
 		isTerminalIn:  isTerminalIn,
 		isTerminalOut: isTerminalOut,
-		tlsConfig:     tlsConfig,
-		scheme:        scheme,
-		transport:     tr,
+		host:          host,
 	}
 }

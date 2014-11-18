@@ -2,18 +2,21 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	gosignal "os/signal"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api"
@@ -30,8 +33,32 @@ var (
 	ErrConnectionRefused = errors.New("Cannot connect to the Docker daemon. Is 'docker -d' running on this host?")
 )
 
-func (cli *DockerCli) HTTPClient() *http.Client {
-	return &http.Client{Transport: cli.transport}
+// getTransport returns the HTTP transport for the CLI, storing it against the
+// CLI for reuse during the client session
+func (cli *DockerCli) getTransport(proto string, addr string, tlsConfig *tls.Config) *http.Transport {
+	if cli.transport == nil {
+		cli.transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+
+		// Why 32? See issue 8035
+		timeout := 32 * time.Second
+		if proto == "unix" {
+			// no need in compressing for local communications
+			cli.transport.DisableCompression = true
+			cli.transport.Dial = func(_, _ string) (net.Conn, error) {
+				return net.DialTimeout(proto, addr, timeout)
+			}
+		} else {
+			cli.transport.Dial = (&net.Dialer{Timeout: timeout}).Dial
+		}
+
+	}
+	return cli.transport
+}
+
+func (cli *DockerCli) HTTPClient(proto, addr string, tlsConfig *tls.Config) *http.Client {
+	return &http.Client{Transport: cli.getTransport(proto, addr, tlsConfig)}
 }
 
 func (cli *DockerCli) encodeData(data interface{}) (*bytes.Buffer, error) {
@@ -55,6 +82,11 @@ func (cli *DockerCli) encodeData(data interface{}) (*bytes.Buffer, error) {
 }
 
 func (cli *DockerCli) call(method, path string, data interface{}, passAuthInfo bool) (io.ReadCloser, int, error) {
+	proto, addr, tlsConfig, err := cli.host.GetConnectionDetails()
+	if err != nil {
+		return nil, -1, err
+	}
+
 	params, err := cli.encodeData(data)
 	if err != nil {
 		return nil, -1, err
@@ -84,20 +116,26 @@ func (cli *DockerCli) call(method, path string, data interface{}, passAuthInfo b
 		}
 	}
 	req.Header.Set("User-Agent", "Docker-Client/"+dockerversion.VERSION)
-	req.URL.Host = cli.addr
-	req.URL.Scheme = cli.scheme
+
+	req.URL.Host = addr
+	if tlsConfig == nil {
+		req.URL.Scheme = "http"
+	} else {
+		req.URL.Scheme = "https"
+	}
+
 	if data != nil {
 		req.Header.Set("Content-Type", "application/json")
 	} else if method == "POST" {
 		req.Header.Set("Content-Type", "plain/text")
 	}
-	resp, err := cli.HTTPClient().Do(req)
+	resp, err := cli.HTTPClient(proto, addr, tlsConfig).Do(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil, -1, ErrConnectionRefused
 		}
 
-		if cli.tlsConfig == nil {
+		if tlsConfig == nil {
 			return nil, -1, fmt.Errorf("%v. Are you trying to connect to a TLS-enabled daemon without TLS?", err)
 		}
 		return nil, -1, fmt.Errorf("An error occurred trying to connect: %v", err)
@@ -123,6 +161,11 @@ func (cli *DockerCli) stream(method, path string, in io.Reader, out io.Writer, h
 }
 
 func (cli *DockerCli) streamHelper(method, path string, setRawTerminal bool, in io.Reader, stdout, stderr io.Writer, headers map[string][]string) error {
+	proto, addr, tlsConfig, err := cli.host.GetConnectionDetails()
+	if err != nil {
+		return err
+	}
+
 	if (method == "POST" || method == "PUT") && in == nil {
 		in = bytes.NewReader([]byte{})
 	}
@@ -132,8 +175,12 @@ func (cli *DockerCli) streamHelper(method, path string, setRawTerminal bool, in 
 		return err
 	}
 	req.Header.Set("User-Agent", "Docker-Client/"+dockerversion.VERSION)
-	req.URL.Host = cli.addr
-	req.URL.Scheme = cli.scheme
+	req.URL.Host = addr
+	if tlsConfig == nil {
+		req.URL.Scheme = "http"
+	} else {
+		req.URL.Scheme = "https"
+	}
 	if method == "POST" {
 		req.Header.Set("Content-Type", "plain/text")
 	}
@@ -143,7 +190,7 @@ func (cli *DockerCli) streamHelper(method, path string, setRawTerminal bool, in 
 			req.Header[k] = v
 		}
 	}
-	resp, err := cli.HTTPClient().Do(req)
+	resp, err := cli.HTTPClient(proto, addr, tlsConfig).Do(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return fmt.Errorf("Cannot connect to the Docker daemon. Is 'docker -d' running on this host?")

@@ -1,15 +1,15 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"os"
-	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/client"
+	"github.com/docker/docker/api/client/auth"
 	"github.com/docker/docker/dockerversion"
+	"github.com/docker/docker/hosts"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/docker/docker/utils"
@@ -68,55 +68,95 @@ func main() {
 		}
 	}
 
-	if len(flHosts) == 0 {
-		defaultHost := os.Getenv("DOCKER_HOST")
-		if defaultHost == "" || *flDaemon {
-			// If we do not have a host, default to unix socket
-			defaultHost = fmt.Sprintf("unix://%s", api.DEFAULTUNIXSOCKET)
-		}
-		defaultHost, err := api.ValidateHost(defaultHost)
-		if err != nil {
-			log.Fatal(err)
-		}
-		flHosts = append(flHosts, defaultHost)
-	}
-
 	if *flDaemon {
+		if len(flHosts) == 0 {
+			defaultHost := os.Getenv("DOCKER_HOST")
+			if defaultHost == "" || *flDaemon {
+				// If we do not have a host, default to unix socket
+				defaultHost = fmt.Sprintf("unix://%s", api.DEFAULTUNIXSOCKET)
+			}
+			defaultHost, err := api.ValidateHostURL(defaultHost)
+			if err != nil {
+				log.Fatal(err)
+			}
+			flHosts = append(flHosts, defaultHost)
+		}
+
 		mainDaemon()
 		return
 	}
 
-	if len(flHosts) > 1 {
-		log.Fatal("Please specify only one -H")
-	}
-	protoAddrParts := strings.SplitN(flHosts[0], "://", 2)
-	proto, addr := protoAddrParts[0], protoAddrParts[1]
+	var (
+		host  *hosts.Host
+		err   error
+		store = hosts.NewStore()
+	)
 
 	trustKey, err := api.LoadOrCreateTrustKey(*flTrustKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var tlsConfig *tls.Config
+	// Select active host if no host has been specified
+	if len(flHosts) == 0 {
+		host, err = store.GetActive()
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if len(flHosts) > 1 {
+			log.Fatal("Please specify only one -H")
+		}
 
-	if proto != "unix" {
-		switch *flAuth {
-		case "identity":
-			if tlsConfig, err = client.NewIdentityAuthTLSConfig(trustKey, *flTrustHosts, proto, addr); err != nil {
+		hostURL := flHosts[0]
+
+		// Attempt to find a host if it's a valid name
+		if _, err := hosts.ValidateHostName(hostURL); err == nil {
+			exists, err := store.Exists(hostURL)
+			if err != nil {
 				log.Fatal(err)
 			}
-		case "cert":
-			if tlsConfig, err = client.NewCertAuthTLSConfig(*flAuthCa, *flAuthCert, *flAuthKey); err != nil {
+			if !exists {
+				log.Fatal(fmt.Errorf("Host %q does not exist. Create it using 'docker hosts create'.", hostURL))
+			}
+			host, err = store.Load(hostURL)
+			if err != nil {
 				log.Fatal(err)
 			}
-		case "none":
-			tlsConfig = nil
-		default:
-			log.Fatalf("Unknown auth method: %s", *flAuth)
+		} else {
+			host = hosts.NewDefaultHost(hostURL)
 		}
 	}
 
-	cli := client.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, trustKey, proto, addr, tlsConfig)
+	// Select an auth method
+	switch *flAuth {
+	// By default, use no auth for default host, cert auth for normal hosts
+	case "":
+		if !host.IsDefault() {
+			host.AuthMethod = &auth.IdentityAuth{
+				TrustKey:       trustKey,
+				KnownHostsPath: *flTrustHosts,
+			}
+		}
+	// Override auth method
+	case "cert":
+		host.AuthMethod = &auth.CertAuth{
+			CAPath:   *flAuthCa,
+			CertPath: *flAuthCert,
+			KeyPath:  *flAuthKey,
+		}
+	case "identity":
+		host.AuthMethod = &auth.IdentityAuth{
+			TrustKey:       trustKey,
+			KnownHostsPath: *flTrustHosts,
+		}
+	case "none":
+		host.AuthMethod = nil
+	default:
+		log.Fatalf("Unknown auth method: %s", *flAuth)
+	}
+
+	cli := client.NewDockerCli(os.Stdin, os.Stdout, os.Stderr, trustKey, host)
 
 	if err := cli.Cmd(flag.Args()...); err != nil {
 		if sterr, ok := err.(*utils.StatusError); ok {
