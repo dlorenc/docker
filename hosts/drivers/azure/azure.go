@@ -157,7 +157,7 @@ func (driver *Driver) SetConfigFromFlags(flagsInterface interface{}) error {
 	}
 
 	if *flags.Image == "" {
-		driver.Image = "b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04-LTS-amd64-server-20140724-en-us-30GB"
+		driver.Image = "b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04_1-LTS-amd64-server-20140927-en-us-30GB"
 	} else {
 		driver.Image = *flags.Image
 	}
