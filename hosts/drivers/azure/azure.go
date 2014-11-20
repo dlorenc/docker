@@ -245,10 +245,10 @@ func (driver *Driver) GetState() (state.State, error) {
 	dockerVM, err := vmClient.GetVMDeployment(driver.Name, driver.Name)
 	if err != nil {
 		if strings.Contains(err.Error(), "Code: ResourceNotFound") {
-			return state.None, fmt.Errorf("Azure host was not found. Please check your Azure subscription.")
+			return state.Error, fmt.Errorf("Azure host was not found. Please check your Azure subscription.")
 		}
 
-		return state.None, err
+		return state.Error, err
 	}
 
 	vmState := dockerVM.RoleInstanceList.RoleInstance[0].PowerState
