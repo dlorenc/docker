@@ -100,8 +100,8 @@ func (d *Driver) Create() error {
 	if d.Boot2DockerURL != "" {
 		isoURL = d.Boot2DockerURL
 	} else {
-		// HACK: Docker 1.3 boot2docker image
-		isoURL = "http://cl.ly/1c1c0O3N193A/download/boot2docker-1.2.0-dev.iso"
+		// HACK: Docker 1.3 boot2docker image with client/daemon auth
+		isoURL = "https://bfirsh.s3.amazonaws.com/boot2docker/boot2docker-1.3.1-client-daemon-auth.iso"
 		// isoURL, err = getLatestReleaseURL()
 		// if err != nil {
 		// 	return err
