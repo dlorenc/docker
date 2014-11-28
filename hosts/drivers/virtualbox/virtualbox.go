@@ -74,7 +74,7 @@ func (d *Driver) GetURL() (string, error) {
 	if ip == "" {
 		return "", nil
 	}
-	return fmt.Sprintf("tcp://%s:2375", ip), nil
+	return fmt.Sprintf("tcp://%s:2376", ip), nil
 }
 
 func (d *Driver) SetConfigFromFlags(flagsInterface interface{}) error {
@@ -101,7 +101,7 @@ func (d *Driver) Create() error {
 		isoURL = d.Boot2DockerURL
 	} else {
 		// HACK: Docker 1.3 boot2docker image with client/daemon auth
-		isoURL = "https://bfirsh.s3.amazonaws.com/boot2docker/boot2docker-1.3.1-client-daemon-auth.iso"
+		isoURL = "https://bfirsh.s3.amazonaws.com/boot2docker/boot2docker-1.3.1-identity-auth.iso"
 		// isoURL, err = getLatestReleaseURL()
 		// if err != nil {
 		// 	return err
@@ -258,7 +258,36 @@ func (d *Driver) Create() error {
 
 	log.Infof("Starting Virtualbox VM...")
 
-	return d.Start()
+	if err := d.Start(); err != nil {
+		return err
+	}
+
+	log.Debugf("Adding key to authorized-keys.d...")
+
+	// HACK: pass key through to here and use public key
+	f, err := os.Open("/Users/ben/.docker/public-key.json")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	cmd, err := d.GetSSHCommand("mkdir -p /root/.docker/authorized-keys.d && cat > /root/.docker/authorized-keys.d/docker-host.json")
+	if err != nil {
+		return err
+	}
+	cmd.Stdin = f
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	cmd, err = d.GetSSHCommand("sudo /etc/init.d/docker restart")
+	if err != nil {
+		return err
+	}
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *Driver) Start() error {

@@ -65,9 +65,6 @@ var (
 func init() {
 	dockerHome := filepath.Join(getHomeDir(), ".docker")
 
-	if dockerAuth == "" {
-		dockerAuth = "none"
-	}
 	if dockerCertPath == "" {
 		dockerCertPath = dockerHome
 	}
