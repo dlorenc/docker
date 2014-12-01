@@ -24,6 +24,12 @@ func GetSSHCommand(host string, port int, user string, sshKey string, args ...st
 
 	sshArgs := append(defaultSSHArgs, args...)
 	cmd := exec.Command("ssh", sshArgs...)
+	cmd.Stderr = os.Stderr
+
+	if os.Getenv("DEBUG") != "" {
+		cmd.Stdout = os.Stdout
+	}
+
 	log.Debugf("executing: %v", strings.Join(cmd.Args, " "))
 
 	return cmd
