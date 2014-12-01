@@ -118,11 +118,11 @@ func (d *Driver) Create() error {
 		return err
 	}
 
+	log.Infof("Creating Virtualbox VM...")
+
 	if err := d.generateDiskImage(d.DiskSize); err != nil {
 		return err
 	}
-
-	log.Infof("Creating Virtualbox VM...")
 
 	if err := vbm("createvm",
 		"--name", d.MachineName,
