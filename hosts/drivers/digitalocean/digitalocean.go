@@ -182,19 +182,7 @@ func (d *Driver) Create() error {
 
 	log.Debugf("Adding key to authorized-keys.d...")
 
-	// HACK: pass key through to here and use public key
-	f, err := os.Open("/Users/ben/.docker/public-key.json")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	cmd, err = d.GetSSHCommand("mkdir -p /.docker/authorized-keys.d && cat > /.docker/authorized-keys.d/docker-host.json")
-	if err != nil {
-		return err
-	}
-	cmd.Stdin = f
-	if err := cmd.Run(); err != nil {
+	if err := drivers.AddPublicKeyToAuthorizedHosts(d, "/.docker/authorized-keys.d"); err != nil {
 		return err
 	}
 
