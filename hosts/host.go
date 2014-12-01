@@ -76,9 +76,6 @@ func ValidateHostName(name string) (string, error) {
 
 func (h *Host) Create() error {
 	if err := h.Driver.Create(); err != nil {
-		if rmErr := h.removeStorePath(); rmErr != nil {
-			log.Errorf("Error cleaning up: %s", rmErr)
-		}
 		return err
 	}
 	if err := h.SaveConfig(); err != nil {
