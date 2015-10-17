@@ -6,6 +6,7 @@ import (
 	_ "github.com/docker/docker/daemon/logger/awslogs"
 	_ "github.com/docker/docker/daemon/logger/fluentd"
 	_ "github.com/docker/docker/daemon/logger/gelf"
+	_ "github.com/docker/docker/daemon/logger/googlelogs"
 	_ "github.com/docker/docker/daemon/logger/journald"
 	_ "github.com/docker/docker/daemon/logger/jsonfilelog"
 	_ "github.com/docker/docker/daemon/logger/syslog"

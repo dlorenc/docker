@@ -18,7 +18,7 @@ clone git github.com/microsoft/hcsshim 325e531f8c49dd78580d5fd197ddb972fa4610e7
 clone git github.com/mistifyio/go-zfs v2.1.1
 clone git github.com/tchap/go-patricia v2.1.0
 clone git github.com/vdemeester/shakers 3c10293ce22b900c27acad7b28656196fcc2f73b
-clone git golang.org/x/net 3cffabab72adf04f8e3b01c5baf775361837b5fe https://github.com/golang/net.git
+clone git golang.org/x/net cd8c2701a5e10f044db915e65eac68f738399d22 https://github.com/golang/net.git
 
 #get libnetwork packages
 clone git github.com/docker/libnetwork 2934f6bf585fa24c86048cc85f7506a5bb626bf5
@@ -66,5 +66,11 @@ clone git gopkg.in/fsnotify.v1 v1.2.0
 # awslogs deps
 clone git github.com/aws/aws-sdk-go v0.7.1
 clone git github.com/vaughan0/go-ini a98ad7ee00ec53921f08832bc06ecf7fd600e6a1
+
+# googlelogs deps
+clone git google.golang.org/api 73781a6ca4d12290ff2db685952206a502e5fd41 https://github.com/google/google-api-go-client
+clone git golang.org/x/oauth2 ef4eca6b097fad7cec79afcc278d213a6de1c960 https://github.com/golang/oauth2.git
+clone git google.golang.org/cloud 4bea1598a0936d6d116506b59a8e1aa962b585c3 https://github.com/GoogleCloudPlatform/gcloud-golang.git
+clone git google.golang.org/grpc 9210c87f856a18cd611c8a590d0ad9d1aa2a6a51 https://github.com/grpc/grpc-go.git
 
 clean
